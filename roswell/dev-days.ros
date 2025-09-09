@@ -4,52 +4,56 @@
 exec ros -Q -L sbcl-bin -- $0 "$@"
 |#
 
-(progn
-  (ros:ensure-asdf)
-  (let ((*standard-output* (make-broadcast-stream))
-        (*trace-output* (make-broadcast-stream)))
-    (funcall (intern (string '#:load-system) '#:asdf) '#:dev-days-calculator)))
+(ros:ensure-asdf)
+(funcall (intern "LOAD-SYSTEM" :asdf) '#:dev-days-calculator)
 
-(defpackage #:ros/script/dev-days-calculator
+(defpackage #:ros/script/dev-days
   (:use #:cl)
-  (:import-from #:dev-days-calculator #:main))
+  (:export #:main))
 
-(in-package #:ros/script/dev-days-calculator)
-
+(in-package #:ros/script/dev-days)
 
 (defun usage ()
-  (format t "Usage: ~A [--mins N] [--hours N] [--days N]~%~%
+  (format t "Usage: dev-days [--mins N] [--hours N] [--days N] [--help]~%~%
 Examples:~%
-  ~A --mins 30~%
-  ~A --hours 2 --mins 30~%
-  ~A --days 1 --hours 4~%"
-          (or (car sb-ext:*posix-argv*) "dev-days")
-          (or (car sb-ext:*posix-argv*) "dev-days")
-          (or (car sb-ext:*posix-argv*) "dev-days")
-          (or (car sb-ext:*posix-argv*) "dev-days")))
+  dev-days --mins 30~%
+  dev-days --hours 2 --mins 30~%
+  dev-days --days 1 --hours 4~%"))
 
-(defun parse-integer-safe (s)
-  (when s (parse-integer s :junk-allowed t)))
+(defun parse-number-safe (s)
+  "Parse integer/float from S (string designator). Return NIL on failure."
+  (handler-case
+      (let* ((str (princ-to-string s))
+             (obj (read-from-string str)))
+        (when (numberp obj) obj))
+    (error () nil)))
 
 (defun main (&rest argv)
   (let ((mins 0) (hours 0) (days 0))
-    (labels ((next (i) (and (< i (length argv)) (nth i argv))))
+    ;; simple argv parser (coerce any token to string safely)
+    (labels ((tok (i) (and (< i (length argv)) (nth i argv)))
+             (tokstr (i) (and (tok i) (princ-to-string (tok i)))))
       (loop for i from 0 below (length argv) do
-            (let ((arg (next i)))
+            (let* ((raw (tok i))
+                   (a   (and raw (string-downcase (princ-to-string raw)))))
               (cond
-                ((or (string= arg "-h") (string= arg "--help"))
+                ((or (string= a "--help") (string= a "-h"))
                  (usage) (return-from main 0))
 
-                ((string= arg "--mins")
-                 (setf mins (or (parse-integer-safe (next (incf i))) 0)))
+                ((or (string= a "--mins") (string= a "-m"))
+                 (setf mins (or (parse-number-safe (tokstr (incf i))) 0)))
 
-                ((string= arg "--hours")
-                 (setf hours (or (parse-integer-safe (next (incf i))) 0)))
+                ((or (string= a "--hours") (string= a "-H"))
+                 (setf hours (or (parse-number-safe (tokstr (incf i))) 0)))
 
-                ((string= arg "--days")
-                 (setf days (or (parse-integer-safe (next (incf i))) 0)))))))
+                ((or (string= a "--days") (string= a "-d"))
+                 (setf days (or (parse-number-safe (tokstr (incf i))) 0)))
+
+                ((and (= (length argv) 1))
+                 (let ((n (parse-number-safe raw)))
+                   (when n (setf mins n))))))))
 
     (let ((result (dev-days-calculator:main :mins mins :hours hours :days days)))
-      (format t "~,2f work days~%" result)
+      (format t "~,2f work day(s)~%" result)
       (finish-output)
       0)))
