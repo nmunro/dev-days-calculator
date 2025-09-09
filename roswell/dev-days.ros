@@ -16,5 +16,40 @@ exec ros -Q -L sbcl-bin -- $0 "$@"
 
 (in-package #:ros/script/dev-days-calculator)
 
-(defun main (&key (mins 0) (hours 0) (days 0))
-  (apply #'main `(:mins ,mins :hours ,hours :days ,days)))
+
+(defun usage ()
+  (format t "Usage: ~A [--mins N] [--hours N] [--days N]~%~%
+Examples:~%
+  ~A --mins 30~%
+  ~A --hours 2 --mins 30~%
+  ~A --days 1 --hours 4~%"
+          (or (car sb-ext:*posix-argv*) "dev-days")
+          (or (car sb-ext:*posix-argv*) "dev-days")
+          (or (car sb-ext:*posix-argv*) "dev-days")
+          (or (car sb-ext:*posix-argv*) "dev-days")))
+
+(defun parse-integer-safe (s)
+  (when s (parse-integer s :junk-allowed t)))
+
+(defun main (&rest argv)
+  (let ((mins 0) (hours 0) (days 0))
+    (labels ((next (i) (and (< i (length argv)) (nth i argv))))
+      (loop for i from 0 below (length argv) do
+            (let ((arg (next i)))
+              (cond
+                ((or (string= arg "-h") (string= arg "--help"))
+                 (usage) (return-from main 0))
+
+                ((string= arg "--mins")
+                 (setf mins (or (parse-integer-safe (next (incf i))) 0)))
+
+                ((string= arg "--hours")
+                 (setf hours (or (parse-integer-safe (next (incf i))) 0)))
+
+                ((string= arg "--days")
+                 (setf days (or (parse-integer-safe (next (incf i))) 0)))))))
+
+    (let ((result (dev-days-calculator:main :mins mins :hours hours :days days)))
+      (format t "~,2f work days~%" result)
+      (finish-output)
+      0)))
