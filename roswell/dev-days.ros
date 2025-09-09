@@ -1,0 +1,20 @@
+#!/bin/sh
+#|-*- mode:lisp -*-|#
+#|
+exec ros -Q -L sbcl-bin -- $0 "$@"
+|#
+
+(progn
+  (ros:ensure-asdf)
+  (let ((*standard-output* (make-broadcast-stream))
+        (*trace-output* (make-broadcast-stream)))
+    (funcall (intern (string '#:load-system) '#:asdf) '#:dev-days-calculator)))
+
+(defpackage #:ros/script/dev-days-calculator
+  (:use #:cl)
+  (:import-from #:dev-days-calculator #:main))
+
+(in-package #:ros/script/dev-days-calculator)
+
+(defun main (&key (mins 0) (hours 0) (days 0))
+  (apply #'main `(:mins ,mins :hours ,hours :days ,days)))
